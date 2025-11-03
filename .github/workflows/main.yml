@@ -1,0 +1,45 @@
+name: Security Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sast:
+    name: Static Analysis (SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Rodar CodeQL (SAST)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript  # troque conforme seu projeto (python, java, etc)
+
+      - name: Analisar com CodeQL
+        uses: github/codeql-action/analyze@v3
+
+  dast:
+    name: Dynamic Analysis (DAST)
+    runs-on: ubuntu-latest
+    needs: sast  # roda após SAST
+    steps:
+      - name: Iniciar aplicação (exemplo Node)
+        run: |
+          npm install
+          npm start &
+          sleep 10  # tempo para subir o servidor
+
+      - name: Rodar ZAP DAST Scan
+        uses: zaproxy/action-full-scan@v0.7.0
+        with:
+          target: 'http://localhost:3000'  # troque pela URL local ou de testes
+      - name: Falhar se vulnerabilidades críticas forem encontradas
+        run: |
+          if grep -q "CRITICAL" codeql-results.sarif; then
+            echo "⚠️ Vulnerabilidades críticas encontradas!"
+            exit 1
+          fi
